@@ -6,6 +6,7 @@ import com.freedom.health.model.HealthResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.util.CollectionUtils;
 
 import javax.servlet.http.HttpServletResponse;
 import java.lang.management.ManagementFactory;
@@ -34,24 +35,30 @@ public class HealthService {
     healthResponse.setApplicationStartTime(getApplicationStartTime().toString());
 
     List<DependencyHealthResponse> dependencyHealthResponses = new ArrayList<>();
-    for (HealthCheck healthCheck : healthChecks) {
-      DependencyHealthResponse dependencyHealthResponse = null;
-      try {
-        dependencyHealthResponse = healthCheck.health();
-      } catch (Exception e) {
-        dependencyHealthResponse = new DependencyHealthResponse();
-        dependencyHealthResponse.setHealthStatus(Enums.HEALTH_STATUS.NON_HEALTHY);
-        dependencyHealthResponse.setEntity(healthCheck.entity());
-        dependencyHealthResponse.setCause(e.getLocalizedMessage());
-      } finally {
-        dependencyHealthResponses.add(dependencyHealthResponse);
-        if (dependencyHealthResponse != null) {
-          setHealthAsFailure(
-              dependencyHealthResponse.getHealthStatus(), httpServletResponse, healthResponse);
-        } else {
-          setHealthAsFailure(Enums.HEALTH_STATUS.NON_HEALTHY, httpServletResponse, healthResponse);
-        }
-      }
+    if (!CollectionUtils.isEmpty(healthChecks)) {
+      healthChecks.forEach(
+          healthCheck -> {
+            DependencyHealthResponse dependencyHealthResponse = null;
+            try {
+              dependencyHealthResponse = healthCheck.health();
+            } catch (Exception e) {
+              dependencyHealthResponse = new DependencyHealthResponse();
+              dependencyHealthResponse.setHealthStatus(Enums.HEALTH_STATUS.NON_HEALTHY);
+              dependencyHealthResponse.setEntity(healthCheck.entity());
+              dependencyHealthResponse.setCause(e.getLocalizedMessage());
+            } finally {
+              dependencyHealthResponses.add(dependencyHealthResponse);
+              if (dependencyHealthResponse != null) {
+                setHealthAsFailure(
+                    dependencyHealthResponse.getHealthStatus(),
+                    httpServletResponse,
+                    healthResponse);
+              } else {
+                setHealthAsFailure(
+                    Enums.HEALTH_STATUS.NON_HEALTHY, httpServletResponse, healthResponse);
+              }
+            }
+          });
     }
     healthResponse.setDependencyHealthResponses(dependencyHealthResponses);
     return healthResponse;
